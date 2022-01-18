@@ -3,12 +3,12 @@
 If you have recently created a contract with this template, you probably could use some
 help on how to build and test the contract, as well as prepare it for production. This
 file attempts to provide a brief overview, assuming you have installed a recent
-version of Rust already (eg. 1.51.0+).
+version of Rust already (eg. 1.58.0+).
 
 ## Prerequisites
 
 Before starting, make sure you have [rustup](https://rustup.rs/) along with a
-recent `rustc` and `cargo` version installed. Currently, we are testing on 1.51.0+.
+recent `rustc` and `cargo` version installed. Currently, we are testing on 1.58.0+.
 
 And you need to have the `wasm32-unknown-unknown` target installed as well.
 
@@ -28,7 +28,7 @@ Now that you created your custom contract, make sure you can compile and run it 
 making any changes. Go into the repository and do:
 
 ```sh
-# this will produce a wasm build in ./target/wasm32-unknown-unknown/release/YOUR_NAME_HERE.wasm
+# this will produce a wasm build in ./target/wasm32-unknown-unknown/release/rock_paper_scissors_terra.wasm
 cargo wasm
 
 # this runs unit tests with helpful backtraces
@@ -68,22 +68,7 @@ code did indeed come from the claimed rust code.
 
 To solve both these issues, we have produced `rust-optimizer`, a docker image to
 produce an extremely small build output in a consistent manner. The suggest way
-to run it is this:
-
-```sh
-docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.12.4
-```
-
-Or, If you're on an arm64 machine, you should use a docker image built with arm64.
-```sh
-docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer-arm64:0.12.4
-```
+to run it can be found [here](https://docs.terra.money/Tutorials/Smart-contracts/Write-smart-contract.html#optimizing-your-build), or, by running `cargo run-script optimize`.
 
 We must mount the contract code to `/code`. You can use a absolute path instead
 of `$(pwd)` if you don't want to `cd` to the directory first. The other two
@@ -96,7 +81,7 @@ This is rather slow compared to local compilations, especially the first compile
 of a given contract. The use of the two volume caches is very useful to speed up
 following compiles of the same contract.
 
-This produces an `artifacts` directory with a `PROJECT_NAME.wasm`, as well as
+This produces an `artifacts` directory with a `rock_paper_scissors_terra.wasm`, as well as
 `checksums.txt`, containing the Sha256 hash of the wasm file.
 The wasm file is compiled deterministically (anyone else running the same
 docker on the same git commit should get the identical file with the same Sha256 hash).
