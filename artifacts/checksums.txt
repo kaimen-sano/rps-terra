@@ -1,0 +1,1 @@
+c57c3e26b26db48437556fcea8c5409350e29307f3d15149baac65dcab5c1d01  rock_paper_scissors_terra.wasm

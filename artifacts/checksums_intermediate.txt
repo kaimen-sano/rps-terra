@@ -1,0 +1,1 @@
+ddcc29c558dced610e9c7e6404f45ae70ca2696e36a09c131e2c7b9e23c52a1a  ./target/wasm32-unknown-unknown/release/rock_paper_scissors_terra.wasm
