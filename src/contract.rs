@@ -205,9 +205,15 @@ fn query_host_matches(deps: Deps, address: Addr) -> StdResult<HostMatchesRespons
 fn query_opponent_matches(deps: Deps, address: Addr) -> StdResult<OpponentMatchesResponse> {
     let matches = MATCHES
         .range(deps.storage, None, None, Order::Ascending)
-        .flat_map(|r| match r {
-            Ok(((_, k), v)) if k == address => Some(v),
-            _ => None,
+        .flat_map(|r| {
+            match r {
+                // warning: this probably has potential for exploits given that we use an unknown length address
+                // so a legitimate user with a name ending with CCCC could be exploited by a user who has XXCCCC
+                // cosmwasm-storage-plus v11.0 fixes this as it will give us the full (&Addr, &Addr) key rather than
+                // a Vec<u8> key.
+                Ok((k, v)) if k.ends_with(&address.as_bytes().to_vec()) => Some(v),
+                _ => None,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -222,16 +228,14 @@ fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
 mod tests {
     use super::*;
 
-    use cosmwasm_std::testing::{
-        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
-    };
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::StdError::GenericErr;
     use cosmwasm_std::{coins, from_binary};
     use cw_controllers::AdminError;
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg { admin: None };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -243,7 +247,7 @@ mod tests {
 
     #[test]
     fn cant_start_with_invalid_address() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let create_info = mock_info("creator", &[]);
 
         let msg = ExecuteMsg::StartGame {
@@ -265,7 +269,7 @@ mod tests {
 
     #[test]
     fn can_start_game_with_valid_address() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let create_info = mock_info("creator", &[]);
 
         let msg = ExecuteMsg::StartGame {
@@ -280,7 +284,7 @@ mod tests {
 
     #[test]
     fn cant_start_game_if_blacklisted() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let creator = mock_info("creator", &[]);
         let bad_user = mock_info("bad_user", &[]);
 
@@ -311,7 +315,7 @@ mod tests {
 
     #[test]
     fn start_game_returns_correct_attributes() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let create_info = mock_info("creator", &[]);
 
         let msg = ExecuteMsg::StartGame {
@@ -333,7 +337,7 @@ mod tests {
 
     #[test]
     fn multiple_players_can_play_at_once() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let host1 = mock_info("creator", &[]);
         let host2 = mock_info("creator2", &[]);
 
@@ -352,7 +356,7 @@ mod tests {
 
     #[test]
     fn cant_respond_to_none_match() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let host = mock_info("host", &[]);
         let responder = mock_info("responder", &[]);
 
@@ -367,7 +371,7 @@ mod tests {
 
     #[test]
     fn can_respond_to_match() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let host = mock_info("host", &[]);
         let responder = mock_info("responder", &[]);
 
@@ -390,7 +394,7 @@ mod tests {
 
     #[test]
     fn deletes_match_on_response() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let host = mock_info("host", &[]);
         let responder = mock_info("responder", &[]);
 
@@ -439,7 +443,7 @@ mod tests {
 
     #[test]
     fn respond_returns_correct_attributes() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
         let host = mock_info("host", &[]);
         let responder = mock_info("responder", &[]);
 
@@ -490,7 +494,7 @@ mod tests {
 
     #[test]
     fn cant_update_admin_if_not_admin() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
 
         instantiate(
             deps.as_mut(),
@@ -513,7 +517,7 @@ mod tests {
 
     #[test]
     fn can_update_admin() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
 
         let old_admin = Addr::unchecked("old_admin");
         let new_admin = Addr::unchecked("new_admin");
@@ -546,7 +550,7 @@ mod tests {
 
     #[test]
     fn get_host_matches_returns_correct_matches() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
 
         let player1 = Addr::unchecked("player1");
         let player2 = Addr::unchecked("player2");
@@ -606,7 +610,7 @@ mod tests {
 
     #[test]
     fn get_opponent_matches_returns_correct_matches() {
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies(&[]);
 
         let player1 = Addr::unchecked("player1");
         let player2 = Addr::unchecked("player2");
@@ -666,7 +670,7 @@ mod tests {
 
     #[test]
     fn get_admin_returns_correct_admin() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let mut deps = mock_dependencies(&[]);
 
         let admin_key = String::from("admin1");
 
