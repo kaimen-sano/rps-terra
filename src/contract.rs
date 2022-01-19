@@ -17,11 +17,17 @@ use crate::state::{GameMove, GameResult, Match, ADMIN, HOOKS, MATCHES};
 const CONTRACT_NAME: &str = "crates.io:rock-paper-scissors-terra";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Instantiates the contract
+///
+/// # Errors
+/// Errors if an `admin` is passed and is not a valid address.
+///
+/// Errors if saving to state fails.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
+    _env: &Env,
+    _info: &MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -33,10 +39,14 @@ pub fn instantiate(
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
+/// Executes a message to the contract.
+///
+/// # Errors
+/// Errors if unable to execute the message.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    _env: &Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
@@ -46,11 +56,11 @@ pub fn execute(
         ExecuteMsg::StartGame {
             opponent,
             first_move,
-        } => try_start_game(deps, info, opponent, first_move),
+        } => try_start_game(deps, info, &opponent, &first_move),
         ExecuteMsg::Respond {
             host,
             response_move,
-        } => try_respond(deps, info, host, response_move),
+        } => try_respond(deps, info, &host, &response_move),
         ExecuteMsg::UpdateAdmin { new_admin } => try_update_admin(deps, info, new_admin),
         ExecuteMsg::AddBlacklisted { addr } => {
             Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, api.addr_validate(addr.as_str())?)?)
@@ -61,11 +71,19 @@ pub fn execute(
     }
 }
 
+/// Starts a new game with an opponent.
+///
+/// # Errors
+/// Errors if the sender is blacklisted from creating a new match (`ContractError::Blacklisted`)
+///
+/// Errors if there is already an active match between the pair (`ContractError::GameInProgress`)
+///
+/// Errors if unable to save to state.
 pub fn try_start_game(
     deps: DepsMut,
     info: MessageInfo,
-    opponent: Addr,
-    first_move: GameMove,
+    opponent: &Addr,
+    first_move: &GameMove,
 ) -> Result<Response, ContractError> {
     // validate opponent is a valid address
     let opponent = deps.api.addr_validate(opponent.as_str())?;
@@ -111,11 +129,17 @@ pub fn try_start_game(
         ))
 }
 
+/// Responds with a move to a match.
+///
+/// # Errors
+/// Errors if the host address is not a valid address
+///
+/// Errors if there is no game between the pair (`ContractError::NoGame`)
 pub fn try_respond(
     deps: DepsMut,
     info: MessageInfo,
-    host: Addr,
-    response_move: GameMove,
+    host: &Addr,
+    response_move: &GameMove,
 ) -> Result<Response, ContractError> {
     // validate host is a valid address
     let host = deps.api.addr_validate(host.as_str())?;
@@ -127,16 +151,16 @@ pub fn try_respond(
 
     let winner = match game.host_move {
         // paper <-> rock
-        GameMove::Paper if response_move == GameMove::Rock => GameResult::HostWins,
-        GameMove::Rock if response_move == GameMove::Paper => GameResult::OpponentWins,
+        GameMove::Paper if response_move == &GameMove::Rock => GameResult::HostWins,
+        GameMove::Rock if response_move == &GameMove::Paper => GameResult::OpponentWins,
 
         // scissors <-> rock
-        GameMove::Rock if response_move == GameMove::Scissors => GameResult::HostWins,
-        GameMove::Scissors if response_move == GameMove::Rock => GameResult::OpponentWins,
+        GameMove::Rock if response_move == &GameMove::Scissors => GameResult::HostWins,
+        GameMove::Scissors if response_move == &GameMove::Rock => GameResult::OpponentWins,
 
         // paper <-> scissors
-        GameMove::Scissors if response_move == GameMove::Paper => GameResult::HostWins,
-        GameMove::Paper if response_move == GameMove::Scissors => GameResult::OpponentWins,
+        GameMove::Scissors if response_move == &GameMove::Paper => GameResult::HostWins,
+        GameMove::Paper if response_move == &GameMove::Scissors => GameResult::OpponentWins,
 
         // otherwise, it must be a draw
         _ => GameResult::Tie,
@@ -159,6 +183,12 @@ pub fn try_respond(
         ))
 }
 
+/// Updates the admin of the contract
+///
+/// # Errors
+/// Errors if the new address is not a valid address
+///
+/// Errors if the new admin was failed to be saved
 pub fn try_update_admin(
     deps: DepsMut,
     info: MessageInfo,
@@ -175,20 +205,24 @@ pub fn try_update_admin(
     )?)
 }
 
+/// Queries some data from the contract.
+///
+/// # Errors
+/// Errors if unable to query the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetHostMatches { host_address } => {
-            to_binary(&query_host_matches(deps, host_address)?)
+            to_binary(&query_host_matches(deps, &host_address)?)
         }
         QueryMsg::GetOpponentMatches { opponent_address } => {
-            to_binary(&query_opponent_matches(deps, opponent_address)?)
+            to_binary(&query_opponent_matches(deps, &opponent_address))
         }
         QueryMsg::GetAdmin {} => to_binary(&query_admin(deps)?),
     }
 }
 
-fn query_host_matches(deps: Deps, address: Addr) -> StdResult<HostMatchesResponse> {
+fn query_host_matches(deps: Deps, address: &Addr) -> StdResult<HostMatchesResponse> {
     // validate address
     let address = deps.api.addr_validate(&address.to_string())?;
 
@@ -202,10 +236,10 @@ fn query_host_matches(deps: Deps, address: Addr) -> StdResult<HostMatchesRespons
     Ok(HostMatchesResponse { matches })
 }
 
-fn query_opponent_matches(deps: Deps, address: Addr) -> StdResult<OpponentMatchesResponse> {
+fn query_opponent_matches(deps: Deps, address: &Addr) -> OpponentMatchesResponse {
     let matches = MATCHES
         .range(deps.storage, None, None, Order::Ascending)
-        .flat_map(|r| {
+        .filter_map(|r| {
             match r {
                 // warning: this probably has potential for exploits given that we use an unknown length address
                 // so a legitimate user with a name ending with CCCC could be exploited by a user who has XXCCCC
@@ -217,7 +251,7 @@ fn query_opponent_matches(deps: Deps, address: Addr) -> StdResult<OpponentMatche
         })
         .collect::<Vec<_>>();
 
-    Ok(OpponentMatchesResponse { matches })
+    OpponentMatchesResponse { matches }
 }
 
 fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
@@ -241,7 +275,7 @@ mod tests {
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = instantiate(deps.as_mut(), &mock_env(), &info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
@@ -257,7 +291,7 @@ mod tests {
 
         let expected_err_msg = "Invalid input: human address too short".to_string();
 
-        let res = execute(deps.as_mut(), mock_env(), create_info, msg).unwrap_err();
+        let res = execute(deps.as_mut(), &mock_env(), create_info, msg).unwrap_err();
 
         match res {
             ContractError::Std(GenericErr { msg }) => {
@@ -278,7 +312,7 @@ mod tests {
         };
 
         // should succeed
-        let res = execute(deps.as_mut(), mock_env(), create_info, msg).unwrap();
+        let res = execute(deps.as_mut(), &mock_env(), create_info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
@@ -291,8 +325,8 @@ mod tests {
         // blacklist "bad_user"
         instantiate(
             deps.as_mut(),
-            mock_env(),
-            creator.clone(),
+            &mock_env(),
+            &creator,
             InstantiateMsg {
                 admin: Some(creator.sender.to_string()),
             },
@@ -302,14 +336,14 @@ mod tests {
         let msg = ExecuteMsg::AddBlacklisted {
             addr: bad_user.sender.clone(),
         };
-        execute(deps.as_mut(), mock_env(), creator.clone(), msg).unwrap();
+        execute(deps.as_mut(), &mock_env(), creator.clone(), msg).unwrap();
 
         // make "bad_user" try make a game
         let msg = ExecuteMsg::StartGame {
             opponent: creator.sender,
             first_move: GameMove::Paper,
         };
-        let res = execute(deps.as_mut(), mock_env(), bad_user, msg).unwrap_err();
+        let res = execute(deps.as_mut(), &mock_env(), bad_user, msg).unwrap_err();
         assert_eq!(ContractError::Blacklisted {}, res);
     }
 
@@ -323,7 +357,7 @@ mod tests {
             first_move: GameMove::Scissors,
         };
 
-        let res = execute(deps.as_mut(), mock_env(), create_info, msg).unwrap();
+        let res = execute(deps.as_mut(), &mock_env(), create_info, msg).unwrap();
         assert_eq!(
             res.attributes,
             vec![
@@ -347,10 +381,10 @@ mod tests {
         };
 
         // both hosts should be able to create a game
-        let res = execute(deps.as_mut(), mock_env(), host1, msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), &mock_env(), host1, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let res = execute(deps.as_mut(), mock_env(), host2, msg).unwrap();
+        let res = execute(deps.as_mut(), &mock_env(), host2, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
@@ -365,7 +399,7 @@ mod tests {
             response_move: GameMove::Rock,
         };
 
-        let res = execute(deps.as_mut(), mock_env(), responder, msg).unwrap_err();
+        let res = execute(deps.as_mut(), &mock_env(), responder, msg).unwrap_err();
         assert_eq!(ContractError::NoGame {}, res);
     }
 
@@ -380,7 +414,7 @@ mod tests {
             first_move: GameMove::Paper,
             opponent: responder.sender.clone(),
         };
-        execute(deps.as_mut(), mock_env(), host.clone(), msg).unwrap();
+        execute(deps.as_mut(), &mock_env(), host.clone(), msg).unwrap();
 
         // respond to match
         let msg = ExecuteMsg::Respond {
@@ -388,7 +422,7 @@ mod tests {
             response_move: GameMove::Scissors,
         };
 
-        let res = execute(deps.as_mut(), mock_env(), responder, msg).unwrap();
+        let res = execute(deps.as_mut(), &mock_env(), responder, msg).unwrap();
         assert!(res.messages.is_empty());
     }
 
@@ -403,14 +437,14 @@ mod tests {
             first_move: GameMove::Paper,
             opponent: responder.sender.clone(),
         };
-        execute(deps.as_mut(), mock_env(), host.clone(), msg).unwrap();
+        execute(deps.as_mut(), &mock_env(), host.clone(), msg).unwrap();
 
         // respond to match
         let msg = ExecuteMsg::Respond {
             host: host.sender.clone(),
             response_move: GameMove::Scissors,
         };
-        execute(deps.as_mut(), mock_env(), responder.clone(), msg).unwrap();
+        execute(deps.as_mut(), &mock_env(), responder.clone(), msg).unwrap();
 
         // both host and opponent should have no matches
         assert!(from_binary::<HostMatchesResponse>(
@@ -454,14 +488,14 @@ mod tests {
                     first_move: host_move,
                     opponent: responder.sender.clone(),
                 };
-                execute(deps.as_mut(), mock_env(), host.clone(), msg).unwrap();
+                execute(deps.as_mut(), &mock_env(), host.clone(), msg).unwrap();
 
                 // respond to match
                 let msg = ExecuteMsg::Respond {
                     host: host.sender.clone(),
                     response_move: opponent_move,
                 };
-                let res = execute(deps.as_mut(), mock_env(), responder.clone(), msg).unwrap();
+                let res = execute(deps.as_mut(), &mock_env(), responder.clone(), msg).unwrap();
 
                 assert_eq!(
                     vec![
@@ -498,8 +532,8 @@ mod tests {
 
         instantiate(
             deps.as_mut(),
-            mock_env(),
-            mock_info("creator", &[]),
+            &mock_env(),
+            &mock_info("creator", &[]),
             InstantiateMsg {
                 admin: Some("creator".to_string()),
             },
@@ -510,7 +544,7 @@ mod tests {
             new_admin: Some(Addr::unchecked("badactor")),
         };
 
-        let res = execute(deps.as_mut(), mock_env(), mock_info("badactor", &[]), msg).unwrap_err();
+        let res = execute(deps.as_mut(), &mock_env(), mock_info("badactor", &[]), msg).unwrap_err();
 
         assert_eq!(ContractError::Admin(AdminError::NotAdmin {}), res);
     }
@@ -528,8 +562,8 @@ mod tests {
 
         instantiate(
             deps.as_mut(),
-            mock_env(),
-            mock_info("old_admin", &[]),
+            &mock_env(),
+            &mock_info("old_admin", &[]),
             InstantiateMsg {
                 admin: Some(old_admin.to_string()),
             },
@@ -537,7 +571,7 @@ mod tests {
         .unwrap();
 
         // should succeed
-        let res = execute(deps.as_mut(), mock_env(), mock_info("old_admin", &[]), msg).unwrap();
+        let res = execute(deps.as_mut(), &mock_env(), mock_info("old_admin", &[]), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // should have new admin
@@ -679,7 +713,7 @@ mod tests {
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
-        instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        instantiate(deps.as_mut(), &mock_env(), &info, msg).unwrap();
 
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetAdmin {}).unwrap();
         let value = from_binary::<AdminResponse>(&res).unwrap();

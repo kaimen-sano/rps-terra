@@ -3,6 +3,7 @@
   "title": "ExecuteMsg",
   "anyOf": [
     {
+      "description": "Starts a new \"rock paper scissors\" game, given the opponent and the first move.",
       "type": "object",
       "required": [
         "start_game"
@@ -19,6 +20,98 @@
               "$ref": "#/definitions/GameMove"
             },
             "opponent": {
+              "$ref": "#/definitions/Addr"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Responds to a \"rock paper scissors\" game, given the host and the move to respond with.\n\nMust be called by the `opponent` in the game.",
+      "type": "object",
+      "required": [
+        "respond"
+      ],
+      "properties": {
+        "respond": {
+          "type": "object",
+          "required": [
+            "host",
+            "response_move"
+          ],
+          "properties": {
+            "host": {
+              "$ref": "#/definitions/Addr"
+            },
+            "response_move": {
+              "$ref": "#/definitions/GameMove"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Passes the admin role on to another address. Must be called by admin.",
+      "type": "object",
+      "required": [
+        "update_admin"
+      ],
+      "properties": {
+        "update_admin": {
+          "type": "object",
+          "properties": {
+            "new_admin": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Addr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Add a blacklisted user. Must be called by admin.",
+      "type": "object",
+      "required": [
+        "add_blacklisted"
+      ],
+      "properties": {
+        "add_blacklisted": {
+          "type": "object",
+          "required": [
+            "addr"
+          ],
+          "properties": {
+            "addr": {
+              "$ref": "#/definitions/Addr"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Remove a blacklisted user. Must be called by admin.",
+      "type": "object",
+      "required": [
+        "remove_blacklisted"
+      ],
+      "properties": {
+        "remove_blacklisted": {
+          "type": "object",
+          "required": [
+            "addr"
+          ],
+          "properties": {
+            "addr": {
               "$ref": "#/definitions/Addr"
             }
           }
